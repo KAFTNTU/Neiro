@@ -1,14 +1,14 @@
-<!DOCTYPE html>
+      <!DOCTYPE html>
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>TNTU Trainer v7</title>
+    <title>TNTU Trainer v10 [Compact]</title>
     <style>
         :root {
             --primary: #00ffcc;
             --bg: #000000;
-            --panel: #1a1a1a;
+            --panel: #161616;
             --danger: #ff4444;
             --success: #00cc66;
             --pinch-color: #ff00ff;
@@ -23,88 +23,126 @@
             overflow: hidden;
         }
 
-        /* --- КАМЕРА --- */
+        /* --- 1. КАМЕРА (Верхні 40%) --- */
         #camera-section {
-            flex: 1;
+            height: 40vh; /* Фіксована висота */
             display: flex; justify-content: center; align-items: center;
-            position: relative; background: #050505;
+            background: #050505;
+            position: relative;
         }
 
         #square-wrapper {
             position: relative;
-            width: 90vw; max-width: 400px;
-            aspect-ratio: 1 / 1;
-            border: 2px solid #333; border-radius: 20px;
+            height: 90%; /* Майже на всю висоту секції */
+            aspect-ratio: 1 / 1; /* Квадрат */
+            border: 2px solid #333; border-radius: 15px;
             overflow: hidden;
-            box-shadow: 0 0 30px rgba(0, 255, 204, 0.1);
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.1);
             transition: border-color 0.2s;
+            display: flex; justify-content: center; align-items: center;
         }
+        
         #square-wrapper.recording { border-color: var(--danger); box-shadow: 0 0 30px rgba(255, 68, 68, 0.4); }
         #square-wrapper.pinched { border-color: var(--pinch-color); box-shadow: 0 0 30px rgba(255, 0, 255, 0.4); }
 
         video, canvas {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; transform: scaleX(-1);
+            position: absolute; height: 100%; width: auto; min-width: 100%; 
+            left: 50%; transform: translateX(50%) scaleX(-1); 
+            object-fit: cover; 
         }
 
         #prediction-overlay {
             position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7); padding: 5px 15px; border-radius: 20px;
-            font-weight: bold; font-size: 16px; color: var(--primary);
+            background: rgba(0, 0, 0, 0.7); padding: 4px 12px; border-radius: 20px;
+            font-weight: bold; font-size: 14px; color: var(--primary);
             z-index: 10; border: 1px solid var(--primary); white-space: nowrap;
         }
 
         #pinch-meter {
-            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.6); padding: 2px 10px; border-radius: 10px;
-            font-family: monospace; font-size: 12px; color: #fff; z-index: 10;
+            position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6); padding: 2px 8px; border-radius: 8px;
+            font-family: monospace; font-size: 11px; color: #fff; z-index: 10;
         }
 
-        /* --- НИЖНЯ ПАНЕЛЬ --- */
-        #bottom-panel {
-            height: auto; min-height: 40vh;
-            background: var(--panel);
+        /* --- 2. ПАНЕЛЬ ІНСТРУМЕНТІВ (Смужка посередині) --- */
+        #toolbar {
+            height: 50px;
+            background: #222;
             border-top: 2px solid var(--primary);
-            border-radius: 25px 25px 0 0;
-            padding: 20px;
-            display: flex; flex-direction: column; gap: 15px;
-            overflow-y: auto;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
-        }
-
-        h2 { margin: 0; font-size: 14px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-
-        .setting-box {
-            background: #222; padding: 10px 15px; border-radius: 12px; border: 1px solid #444;
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;
-        }
-
-        .epoch-input {
-            background: #111; border: 1px solid var(--primary); color: #fff;
-            padding: 5px; width: 80px; text-align: center; border-radius: 5px;
-            font-weight: bold; font-size: 16px; font-family: monospace;
-        }
-
-        .grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
-        
-        button {
-            background: #2a2a2a; border: 1px solid #444; color: var(--primary);
-            padding: 15px; border-radius: 12px; font-size: 13px; font-weight: bold;
-            text-transform: uppercase; cursor: pointer;
+            border-bottom: 1px solid #333;
             display: flex; justify-content: space-between; align-items: center;
-            transition: all 0.2s;
+            padding: 0 20px;
+            z-index: 20;
         }
-        button:active { transform: scale(0.98); }
-        button.record-btn:active { background: var(--danger); color: #fff; border-color: var(--danger); }
-        button:disabled { opacity: 0.5; filter: grayscale(1); cursor: not-allowed; }
 
-        .action-buttons { display: flex; gap: 10px; margin-top: 5px; }
-        .action-btn { flex: 1; background: #004433; border-color: var(--primary); color: #fff; justify-content: center; }
+        #status-log {
+            font-family: monospace; font-size: 12px; color: #aaa;
+        }
+
+        .clear-btn {
+            background: transparent; border: 1px solid #555; color: #888;
+            padding: 6px 15px; border-radius: 6px; font-size: 11px; text-transform: uppercase;
+            cursor: pointer; transition: 0.2s;
+        }
+        .clear-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+        /* --- 3. НИЖНЯ ПАНЕЛЬ (Решта екрану) --- */
+        #bottom-panel {
+            flex: 1; /* Займає решту місця */
+            background: var(--panel);
+            padding: 15px 20px;
+            display: flex; flex-direction: column; gap: 10px;
+            overflow-y: auto;
+        }
+
+        h2 { margin: 0 0 5px 0; font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Сітка кнопок */
+        .grid-buttons { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px; 
+        }
+
+        /* Стиль кнопок запису */
+        .btn-wrapper { position: relative; }
         
-        .count-badge { background: #000; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; }
-        #status-log { font-size: 11px; color: #666; text-align: center; margin-top: 5px; font-family: monospace; }
+        button.record-btn {
+            background: #252525; border: 1px solid #444; color: var(--primary);
+            padding: 15px 10px; border-radius: 10px; font-size: 13px; font-weight: bold;
+            text-transform: uppercase; cursor: pointer; width: 100%;
+            display: flex; justify-content: space-between; align-items: center;
+            transition: all 0.1s;
+        }
+        button.record-btn:active { background: var(--danger); color: #fff; border-color: var(--danger); transform: scale(0.98); }
         
-        .hint-text { font-size: 10px; color: #666; margin-top: 2px; }
+        .hint-text { 
+            font-size: 10px; color: #555; text-align: center; margin-top: 2px; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .count-badge { background: #000; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 11px; }
+
+        /* Секція навчання */
+        .train-section {
+            background: #222; border: 1px solid #333; border-radius: 10px; padding: 10px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+
+        .epoch-row { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #ccc; }
+        .epoch-input {
+            background: #111; border: 1px solid #555; color: #fff;
+            padding: 4px 8px; width: 70px; text-align: center; border-radius: 5px;
+            font-weight: bold; font-family: monospace;
+        }
+
+        .action-buttons { display: flex; gap: 8px; }
+        .action-btn { 
+            flex: 1; background: #004433; border: 1px solid var(--primary); color: #fff; 
+            padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;
+            text-transform: uppercase; font-size: 14px;
+        }
+        .action-btn:disabled { opacity: 0.3; filter: grayscale(1); }
+        .action-btn:active { background: var(--primary); color: #000; }
+
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -114,71 +152,69 @@
 </head>
 <body>
 
+    <!-- 1. КАМЕРА -->
     <div id="camera-section">
         <div id="square-wrapper">
-            <div id="prediction-overlay">Ініціалізація...</div>
+            <div id="prediction-overlay">Запуск...</div>
             <div id="pinch-meter">DIST: 0.00</div>
             <video id="video" playsinline></video>
             <canvas id="output"></canvas>
         </div>
     </div>
 
+    <!-- 2. ПАНЕЛЬ ІНСТРУМЕНТІВ (Тут тепер кнопка Очистити) -->
+    <div id="toolbar">
+        <div id="status-log">Готово до роботи</div>
+        <button class="clear-btn" onclick="clearAll()">🗑 Очистити</button>
+    </div>
+
+    <!-- 3. КНОПКИ ТА НАВЧАННЯ -->
     <div id="bottom-panel">
         
-        <div>
-            <h2>1. Збір даних</h2>
-            <div class="grid-buttons">
-                <!-- IDLE -->
-                <div>
-                    <button class="record-btn" onmousedown="startRec(0)" onmouseup="stopRec()" ontouchstart="startRec(0)" ontouchend="stopRec()">
-                        IDLE (Open) <span id="c0" class="count-badge">0</span>
-                    </button>
-                    <div class="hint-text">Рука відкрита або наводить</div>
-                </div>
-
-                <!-- GRAB -->
-                <div>
-                    <button class="record-btn" onmousedown="startRec(1)" onmouseup="stopRec()" ontouchstart="startRec(1)" ontouchend="stopRec()">
-                        GRAB (Pinch) <span id="c1" class="count-badge">0</span>
-                    </button>
-                    <div class="hint-text">Пальці з'єднані (щипок)</div>
-                </div>
-
-                <!-- ROTATE -->
-                <div>
-                    <button class="record-btn" onmousedown="startRec(2)" onmouseup="stopRec()" ontouchstart="startRec(2)" ontouchend="stopRec()">
-                        ROTATE <span id="c2" class="count-badge">0</span>
-                    </button>
-                    <div class="hint-text">Трикутник пальцями</div>
-                </div>
-
-                <!-- ZOOM -->
-                <div>
-                    <button class="record-btn" onmousedown="startRec(3)" onmouseup="stopRec()" ontouchstart="startRec(3)" ontouchend="stopRec()">
-                        ZOOM <span id="c3" class="count-badge">0</span>
-                    </button>
-                    <div class="hint-text">Лайк або інший жест</div>
-                </div>
+        <!-- Секція Збору -->
+        <div class="grid-buttons">
+            <div class="btn-wrapper">
+                <button class="record-btn" onmousedown="startRec(0)" onmouseup="stopRec()" ontouchstart="startRec(0)" ontouchend="stopRec()">
+                    IDLE <span id="c0" class="count-badge">0</span>
+                </button>
+                <div class="hint-text">Рука відкрита</div>
             </div>
-            <div style="text-align: right; margin-top: 5px;">
-                <button onclick="clearAll()" style="padding: 5px 10px; font-size: 10px; width: auto; display: inline-block; background: transparent; border: 1px solid #444; color: #666;">Очистити</button>
+
+            <div class="btn-wrapper">
+                <button class="record-btn" onmousedown="startRec(1)" onmouseup="stopRec()" ontouchstart="startRec(1)" ontouchend="stopRec()">
+                    GRAB <span id="c1" class="count-badge">0</span>
+                </button>
+                <div class="hint-text">Щипок / Кулак</div>
+            </div>
+
+            <div class="btn-wrapper">
+                <button class="record-btn" onmousedown="startRec(2)" onmouseup="stopRec()" ontouchstart="startRec(2)" ontouchend="stopRec()">
+                    ROTATE <span id="c2" class="count-badge">0</span>
+                </button>
+                <div class="hint-text">Трикутник</div>
+            </div>
+
+            <div class="btn-wrapper">
+                <button class="record-btn" onmousedown="startRec(3)" onmouseup="stopRec()" ontouchstart="startRec(3)" ontouchend="stopRec()">
+                    ZOOM <span id="c3" class="count-badge">0</span>
+                </button>
+                <div class="hint-text">Лайк / Інше</div>
             </div>
         </div>
 
-        <div>
-            <h2>2. Навчання</h2>
+        <!-- Секція Навчання -->
+        <div class="train-section">
+            <div class="epoch-row">
+                <span>Епохи (Epochs):</span>
+                <input type="number" id="epochs-input" class="epoch-input" value="60" min="10">
+            </div>
             
-            <div class="setting-box" style="margin-top: 10px; justify-content: flex-start; gap: 15px;">
-                <label for="epochs-input" style="font-size: 14px; font-weight: bold;">Епохи (Epochs):</label>
-                <input type="number" id="epochs-input" class="epoch-input" value="100" min="1" max="1000000">
-            </div>
-
-            <div id="status-log">Готово</div>
             <div class="action-buttons">
-                <button class="action-btn" id="btn-train" onclick="train()">🚀 Start</button>
-                <button class="action-btn" id="btn-save" onclick="download()" disabled>💾 Save</button>
+                <button class="action-btn" id="btn-train" onclick="train()">🚀 Навчити</button>
+                <button class="action-btn" id="btn-save" onclick="download()" disabled>💾 Скачати</button>
             </div>
         </div>
+
     </div>
 
 <script>
@@ -201,13 +237,10 @@
     const CANVAS = document.getElementById('output');
     const CTX = CANVAS.getContext('2d');
 
-    // --- MEDIAPIPE INIT ---
     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-    
-    // Стандартні налаштування (без перемикача)
     hands.setOptions({
         maxNumHands: 1,
-        modelComplexity: 1,
+        modelComplexity: 1, // Full model for accuracy
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5
     });
@@ -219,27 +252,23 @@
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             const lm = results.multiHandLandmarks[0];
             
-            // 1. Малюємо
             drawConnectors(CTX, lm, HAND_CONNECTIONS, {color: '#00ffcc', lineWidth: 2});
             drawLandmarks(CTX, lm, {color: '#ff0000', lineWidth: 1, radius: 3});
 
-            // 2. Рахуємо відстань (щипок) для візуалізації
             const dist = calculatePinchDist(lm);
-            pinchMeter.innerText = `DIST: ${dist.toFixed(3)}`;
+            pinchMeter.innerText = `DIST: ${dist.toFixed(2)}`;
             
-            // Візуальний ефект "математичного" щипка ( < 0.05)
             if (dist < 0.05 && !isRecording) {
                 wrapper.classList.add('pinched');
             } else {
                 wrapper.classList.remove('pinched');
             }
 
-            // 3. Логіка
             if (isRecording) {
                 record(lm);
                 wrapper.classList.add('recording');
                 wrapper.classList.remove('pinched');
-                predOverlay.innerText = "ЗАПИС: " + CLASSES[currentLabel];
+                predOverlay.innerText = "REC: " + CLASSES[currentLabel];
                 predOverlay.style.color = "#ff4444";
                 predOverlay.style.borderColor = "#ff4444";
             } else {
@@ -247,13 +276,13 @@
                 if (model && !isTraining) {
                     predict(lm);
                 } else {
-                    predOverlay.innerText = "Рука виявлена";
+                    predOverlay.innerText = "Рука є";
                     predOverlay.style.color = "#00ffcc";
                     predOverlay.style.borderColor = "#00ffcc";
                 }
             }
         } else {
-            predOverlay.innerText = "Покажіть руку";
+            predOverlay.innerText = "Немає руки";
             predOverlay.style.color = "#888";
             predOverlay.style.borderColor = "#444";
         }
@@ -265,16 +294,12 @@
     });
     camera.start();
 
-    // --- MATH HELPER ---
     function calculatePinchDist(lm) {
-        // Відстань між вказівним (8) та великим (4)
         const dx = lm[8].x - lm[4].x;
         const dy = lm[8].y - lm[4].y;
-        // z не враховуємо для простоти 2D проекції, або можна врахувати
         return Math.sqrt(dx*dx + dy*dy);
     }
 
-    // --- DATA PROCESSING ---
     function processLandmarks(landmarks) {
         const wrist = landmarks[0];
         const flat = [];
@@ -289,12 +314,11 @@
         return flat.map(v => v / (max + 1e-6));
     }
 
-    // --- RECORDING ---
     function startRec(id) { 
         if(isTraining) return;
         isRecording = true; 
         currentLabel = id; 
-        if(navigator.vibrate) navigator.vibrate(50);
+        if(navigator.vibrate) navigator.vibrate(40);
     }
     function stopRec() { isRecording = false; }
 
@@ -306,6 +330,7 @@
     }
 
     function clearAll() {
+        if(!confirm("Видалити всі записані дані?")) return;
         data = { inputs: [], labels: [] };
         counts = [0,0,0,0];
         for(let i=0; i<4; i++) document.getElementById(`c${i}`).innerText = 0;
@@ -314,7 +339,6 @@
         statusLog.innerText = "Дані очищено";
     }
 
-    // --- TRAINING ---
     async function train() {
         if (data.inputs.length < 10) { alert("Мало даних!"); return; }
         
@@ -336,22 +360,22 @@
 
         model.compile({optimizer: 'adam', loss: 'categoricalCrossentropy', metrics: ['accuracy']});
 
-        statusLog.innerText = `Старт навчання (${userEpochs} епох)...`;
+        statusLog.innerText = `Навчання...`;
         
         await model.fit(inputs, labels, {
             epochs: userEpochs,
             batchSize: 16,
             callbacks: {
                 onEpochEnd: (e, l) => { 
-                    if (e % Math.ceil(userEpochs / 20) === 0 || e === userEpochs - 1) {
-                        statusLog.innerText = `Епоха ${e+1}/${userEpochs}: Точність ${(l.acc*100).toFixed(0)}%`; 
+                    if (e % Math.ceil(userEpochs / 10) === 0 || e === userEpochs - 1) {
+                        statusLog.innerText = `E:${e+1} Acc:${(l.acc*100).toFixed(0)}%`; 
                     }
                 }
             }
         });
 
         isTraining = false;
-        statusLog.innerText = "Готово! Можна тестувати.";
+        statusLog.innerText = "Готово!";
         document.getElementById('btn-train').disabled = false;
         document.getElementById('btn-save').disabled = false;
         inputs.dispose(); labels.dispose();
@@ -370,7 +394,6 @@
             const stableIdx = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
 
             predOverlay.innerText = `${CLASSES[stableIdx]} ${(conf*100).toFixed(0)}%`;
-            // Колір залежить від впевненості
             const color = conf > 0.8 ? "#00ffcc" : "#ffff00";
             predOverlay.style.color = color;
             predOverlay.style.borderColor = color;
