@@ -2,38 +2,165 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TNTU AI TRAINER [Debug Mode]</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>TNTU Square Trainer</title>
     <style>
-        :root { --primary: #00ffcc; --bg: #111; --danger: #ff4444; }
-        body { margin: 0; background: var(--bg); color: #fff; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; }
-        
-        #error-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; padding: 20px;
-            background: rgba(255, 0, 0, 0.9); color: white; z-index: 9999;
-            display: none; font-family: monospace; font-size: 14px; white-space: pre-wrap;
+        :root {
+            --primary: #00ffcc;
+            --bg: #000000;
+            --panel: #1a1a1a;
+            --danger: #ff4444;
+            --active: #00cc66;
         }
 
-        #layout { display: flex; flex: 1; overflow: hidden; }
-        #viewport { flex: 1; background: #000; position: relative; display: flex; justify-content: center; align-items: center; }
-        #sidebar { width: 300px; background: #222; border-left: 2px solid var(--primary); padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
 
-        #cam-container { position: relative; width: 640px; height: 480px; border: 2px solid #444; }
-        video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); object-fit: cover; }
-        
+        /* --- ВЕРХНЯ ЧАСТИНА: КАМЕРА --- */
+        #camera-section {
+            flex: 1; /* Займає весь вільний простір зверху */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background: #050505;
+        }
+
+        /* Квадратний контейнер для камери */
+        #square-wrapper {
+            position: relative;
+            width: 90vw;       /* Ширина 90% екрану */
+            max-width: 400px;  /* Але не більше 400px */
+            aspect-ratio: 1 / 1; /* СТРОГО КВАДРАТ */
+            border: 2px solid #333;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.1);
+            transition: border-color 0.3s;
+        }
+
+        #square-wrapper.recording {
+            border-color: var(--danger);
+            box-shadow: 0 0 30px rgba(255, 68, 68, 0.4);
+        }
+
+        /* Відео та Канвас розтягуються, щоб заповнити квадрат (Cover), не спотворюючи пропорції */
+        video, canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Це прибирає розтягнутість! */
+            transform: scaleX(-1); /* Дзеркальне відображення */
+        }
+
+        /* Напис над камерою */
+        #prediction-overlay {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 18px;
+            color: var(--primary);
+            z-index: 10;
+            border: 1px solid var(--primary);
+        }
+
+        /* --- НИЖНЯ ЧАСТИНА: МЕНЮ --- */
+        #bottom-panel {
+            height: auto;
+            min-height: 40vh; /* Займає 40% екрану знизу */
+            background: var(--panel);
+            border-top: 2px solid var(--primary);
+            border-radius: 25px 25px 0 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+        }
+
+        h2 { margin: 0; font-size: 16px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Сітка для кнопок запису (2 колонки) */
+        .grid-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
         button {
-            padding: 10px; background: #333; color: var(--primary); 
-            border: 1px solid var(--primary); cursor: pointer; font-weight: bold; width: 100%;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: var(--primary);
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
         }
-        button:hover { background: var(--primary); color: #000; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        button.recording { background: var(--danger); color: white; border-color: white; animation: pulse 1s infinite; }
 
-        .stat { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; color: #ccc; }
+        button:active { transform: scale(0.98); }
+        button.record-btn:active { background: var(--danger); color: #fff; border-color: var(--danger); }
         
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        button:disabled { opacity: 0.5; filter: grayscale(1); cursor: not-allowed; }
+
+        /* Кнопки дій (Train, Save) */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        
+        .action-btn {
+            flex: 1;
+            background: #004433;
+            border-color: var(--primary);
+            color: #fff;
+            text-align: center;
+            justify-content: center;
+        }
+        
+        .action-btn:hover { background: var(--primary); color: #000; }
+
+        .count-badge {
+            background: #000;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        #status-log {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin-top: 5px;
+            font-family: monospace;
+        }
+
     </style>
 
-    <!-- Бібліотеки (CDN) -->
+    <!-- Бібліотеки -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
@@ -41,71 +168,76 @@
 </head>
 <body>
 
-    <!-- Блок для помилок -->
-    <div id="error-overlay"></div>
+    <!-- ВЕРХ: Камера (Квадратна) -->
+    <div id="camera-section">
+        <div id="square-wrapper">
+            <div id="prediction-overlay">Очікування...</div>
+            <video id="video" playsinline></video>
+            <canvas id="output"></canvas>
+        </div>
+    </div>
 
-    <div id="layout">
-        <div id="viewport">
-            <div id="cam-container">
-                <video id="video" playsinline></video>
-                <canvas id="output"></canvas>
+    <!-- НИЗ: Меню керування -->
+    <div id="bottom-panel">
+        
+        <!-- Секція запису -->
+        <div>
+            <h2>1. Збір даних (утримуй кнопку)</h2>
+            <div class="grid-buttons" style="margin-top: 10px;">
+                <button class="record-btn" onmousedown="startRec(0)" onmouseup="stopRec()" ontouchstart="startRec(0)" ontouchend="stopRec()">
+                    IDLE <span id="c0" class="count-badge">0</span>
+                </button>
+                <button class="record-btn" onmousedown="startRec(1)" onmouseup="stopRec()" ontouchstart="startRec(1)" ontouchend="stopRec()">
+                    GRAB <span id="c1" class="count-badge">0</span>
+                </button>
+                <button class="record-btn" onmousedown="startRec(2)" onmouseup="stopRec()" ontouchstart="startRec(2)" ontouchend="stopRec()">
+                    ROTATE <span id="c2" class="count-badge">0</span>
+                </button>
+                <button class="record-btn" onmousedown="startRec(3)" onmouseup="stopRec()" ontouchstart="startRec(3)" ontouchend="stopRec()">
+                    ZOOM <span id="c3" class="count-badge">0</span>
+                </button>
+            </div>
+            <div style="text-align: right; margin-top: 5px;">
+                <button onclick="clearAll()" style="padding: 5px 10px; font-size: 10px; width: auto; display: inline-block; background: transparent; border: 1px solid #444; color: #666;">Очистити все</button>
             </div>
         </div>
 
-        <div id="sidebar">
-            <h2 style="margin: 0 0 10px 0; color: var(--primary);">AI Trainer v2</h2>
-            
-            <div style="border: 1px solid #444; padding: 10px; border-radius: 5px;">
-                <div class="stat"><span>0. IDLE (Спокій)</span><span id="c0">0</span></div>
-                <button onmousedown="startRec(0)" onmouseup="stopRec()">REC: IDLE</button>
-
-                <div class="stat"><span>1. GRAB (Хапати)</span><span id="c1">0</span></div>
-                <button onmousedown="startRec(1)" onmouseup="stopRec()">REC: GRAB</button>
-
-                <div class="stat"><span>2. ROTATE (Оберт)</span><span id="c2">0</span></div>
-                <button onmousedown="startRec(2)" onmouseup="stopRec()">REC: ROTATE</button>
-
-                <div class="stat"><span>3. ZOOM (Масштаб)</span><span id="c3">0</span></div>
-                <button onmousedown="startRec(3)" onmouseup="stopRec()">REC: ZOOM</button>
+        <!-- Секція дій -->
+        <div>
+            <h2>2. Навчання та Експорт</h2>
+            <div id="status-log">Готово до роботи</div>
+            <div class="action-buttons">
+                <button class="action-btn" id="btn-train" onclick="train()">🚀 Навчити</button>
+                <button class="action-btn" id="btn-save" onclick="download()" disabled>💾 Скачати</button>
             </div>
-
-            <button onclick="train()" id="btn-train" style="margin-top: 10px;">🚀 START TRAINING</button>
-            <div id="status" style="text-align: center; font-size: 12px; color: #888;">Ready</div>
-
-            <div id="prediction" style="font-size: 20px; text-align: center; font-weight: bold; margin: 10px 0; color: #fff;">---</div>
-
-            <button onclick="download()" id="btn-save" disabled>💾 DOWNLOAD MODEL</button>
         </div>
     </div>
 
 <script>
-    // --- ОБРОБНИК ПОМИЛОК ---
-    window.onerror = function(msg, url, line, col, error) {
-        const div = document.getElementById('error-overlay');
-        div.style.display = 'block';
-        div.innerHTML += `CRITICAL ERROR:\n${msg}\nLine: ${line}\n\nПорада: Спробуйте відкрити через Live Server (не як файл).\n`;
-        return false;
-    };
-
-    // --- ПЕРЕВІРКА КАМЕРИ ---
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Браузер не має доступу до камери! Якщо ви відкрили це як файл (file://), це не спрацює. Запустіть локальний сервер.");
-    }
-
-    // --- ЗМІННІ ---
-    const VIDEO = document.getElementById('video');
-    const CANVAS = document.getElementById('output');
-    const CTX = CANVAS.getContext('2d');
+    // --- НАЛАШТУВАННЯ ---
     const CLASSES = ['Idle', 'Grab', 'Rotate', 'Zoom'];
+    const wrapper = document.getElementById('square-wrapper');
+    const predOverlay = document.getElementById('prediction-overlay');
+    const statusLog = document.getElementById('status-log');
     
+    // --- СТАН ---
     let isRecording = false;
     let currentLabel = -1;
     let data = { inputs: [], labels: [] };
     let counts = [0, 0, 0, 0];
     let model = null;
     let isTraining = false;
+    
+    // Історія для стабілізації (Smoothing)
+    let history = []; 
+    const HISTORY_SIZE = 5;
 
-    // --- MEDIAPIPE ---
+    // --- ELEMENT REFS ---
+    const VIDEO = document.getElementById('video');
+    const CANVAS = document.getElementById('output');
+    const CTX = CANVAS.getContext('2d');
+
+    // --- MEDIAPIPE INIT ---
     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
     hands.setOptions({
         maxNumHands: 1,
@@ -114,36 +246,55 @@
         minTrackingConfidence: 0.5
     });
 
-    hands.onResults(onResults);
-
-    // Запуск камери
-    const camera = new Camera(VIDEO, {
-        onFrame: async () => { await hands.send({image: VIDEO}); },
-        width: 640, height: 480
-    });
-    camera.start().catch(e => {
-        throw new Error("Камера зайнята або недоступна: " + e.message);
-    });
-
-    // --- ЛОГІКА КАДРУ ---
-    function onResults(results) {
+    hands.onResults((results) => {
+        // Очистка і малювання відео
         CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+        
+        // Важливий момент: ми малюємо зображення на весь квадрат
+        // MediaPipe повертає зображення. Video елемент має object-fit: cover.
+        // Щоб landmarks збігалися, ми малюємо зображення на весь canvas.
         CTX.drawImage(results.image, 0, 0, CANVAS.width, CANVAS.height);
 
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             const lm = results.multiHandLandmarks[0];
-            drawConnectors(CTX, lm, HAND_CONNECTIONS, {color: '#00ffcc', lineWidth: 2});
-            drawLandmarks(CTX, lm, {color: '#ff0000', lineWidth: 1, radius: 3});
+            
+            // Малюємо скелет
+            drawConnectors(CTX, lm, HAND_CONNECTIONS, {color: '#00ffcc', lineWidth: 3});
+            drawLandmarks(CTX, lm, {color: '#ff0000', lineWidth: 1, radius: 4});
 
+            // Логіка запису або передбачення
             if (isRecording) {
                 record(lm);
-            } else if (model && !isTraining) {
-                predict(lm);
+                wrapper.classList.add('recording');
+                predOverlay.innerText = "ЗАПИС: " + CLASSES[currentLabel];
+                predOverlay.style.color = "#ff4444";
+                predOverlay.style.borderColor = "#ff4444";
+            } else {
+                wrapper.classList.remove('recording');
+                if (model && !isTraining) {
+                    predict(lm);
+                } else {
+                    predOverlay.innerText = "Рука виявлена";
+                    predOverlay.style.color = "#00ffcc";
+                    predOverlay.style.borderColor = "#00ffcc";
+                }
             }
+        } else {
+            predOverlay.innerText = "Покажіть руку";
+            predOverlay.style.color = "#888";
+            predOverlay.style.borderColor = "#444";
         }
-    }
+    });
 
-    // --- НОРМАЛІЗАЦІЯ ---
+    // --- CAMERA INIT ---
+    const camera = new Camera(VIDEO, {
+        onFrame: async () => { await hands.send({image: VIDEO}); },
+        width: 640,  // Внутрішня роздільна здатність (не впливає на відображення)
+        height: 480
+    });
+    camera.start();
+
+    // --- DATA PROCESSING ---
     function processLandmarks(landmarks) {
         const wrist = landmarks[0];
         const flat = [];
@@ -158,10 +309,17 @@
         return flat.map(v => v / (max + 1e-6));
     }
 
-    // --- ЗАПИС ---
-    function startRec(id) { isRecording = true; currentLabel = id; }
+    // --- RECORDING ---
+    // Додав підтримку Touch подій для мобілок
+    function startRec(id) { 
+        if(isTraining) return;
+        isRecording = true; 
+        currentLabel = id; 
+        // Вібрація на телефоні при натисканні
+        if(navigator.vibrate) navigator.vibrate(50);
+    }
     function stopRec() { isRecording = false; }
-    
+
     function record(lm) {
         data.inputs.push(processLandmarks(lm));
         data.labels.push(currentLabel);
@@ -169,13 +327,23 @@
         document.getElementById(`c${currentLabel}`).innerText = counts[currentLabel];
     }
 
-    // --- НАВЧАННЯ ---
+    function clearAll() {
+        data = { inputs: [], labels: [] };
+        counts = [0,0,0,0];
+        for(let i=0; i<4; i++) document.getElementById(`c${i}`).innerText = 0;
+        if(model) { model.dispose(); model = null; }
+        document.getElementById('btn-save').disabled = true;
+        statusLog.innerText = "Дані очищено";
+    }
+
+    // --- TRAINING ---
     async function train() {
-        if (data.inputs.length < 10) { alert("Мало даних!"); return; }
+        if (data.inputs.length < 10) { alert("Зберіть хоча б по 10 прикладів!"); return; }
         
         isTraining = true;
-        document.getElementById('status').innerText = "Training...";
-        
+        document.getElementById('btn-train').disabled = true;
+        statusLog.innerText = "Підготовка даних...";
+
         const inputs = tf.tensor2d(data.inputs);
         const labels = tf.oneHot(tf.tensor1d(data.labels, 'int32'), 4);
 
@@ -187,39 +355,55 @@
 
         model.compile({optimizer: 'adam', loss: 'categoricalCrossentropy', metrics: ['accuracy']});
 
+        statusLog.innerText = "Навчання...";
+        
         await model.fit(inputs, labels, {
             epochs: 50,
             batchSize: 16,
             callbacks: {
                 onEpochEnd: (e, l) => {
-                    document.getElementById('status').innerText = `Epoch ${e}: Acc ${l.acc.toFixed(2)}`;
+                    if (e % 5 === 0) statusLog.innerText = `Епоха ${e}: Точність ${(l.acc*100).toFixed(0)}%`;
                 }
             }
         });
 
         isTraining = false;
-        document.getElementById('status').innerText = "Done!";
+        statusLog.innerText = "Навчання завершено! Можна тестувати.";
+        document.getElementById('btn-train').disabled = false;
         document.getElementById('btn-save').disabled = false;
         inputs.dispose(); labels.dispose();
     }
 
-    // --- ПЕРЕДБАЧЕННЯ ---
+    // --- PREDICTION ---
     function predict(lm) {
         tf.tidy(() => {
             const input = tf.tensor2d([processLandmarks(lm)]);
             const pred = model.predict(input);
             const idx = pred.argMax(1).dataSync()[0];
             const conf = pred.dataSync()[idx];
+
+            // Стабілізація (Smoothing)
+            history.push(idx);
+            if(history.length > HISTORY_SIZE) history.shift();
             
-            const txt = document.getElementById('prediction');
-            txt.innerText = `${CLASSES[idx]} ${(conf*100).toFixed(0)}%`;
-            txt.style.color = conf > 0.8 ? '#00ffcc' : '#555';
+            // Знаходимо найчастіший клас в історії
+            const counts = {};
+            history.forEach(h => counts[h] = (counts[h] || 0) + 1);
+            const stableIdx = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+
+            const labelName = CLASSES[stableIdx];
+            
+            // Оновлюємо UI
+            predOverlay.innerText = `${labelName} ${(conf*100).toFixed(0)}%`;
+            predOverlay.style.color = conf > 0.8 ? "#00ffcc" : "#ffff00";
+            predOverlay.style.borderColor = conf > 0.8 ? "#00ffcc" : "#ffff00";
         });
     }
 
-    // --- ЗАВАНТАЖЕННЯ ---
+    // --- DOWNLOAD ---
     async function download() {
         await model.save('downloads://gesture-model');
+        statusLog.innerText = "Файли завантажено. Перемістіть їх у папку проєкту.";
     }
 </script>
 </body>
