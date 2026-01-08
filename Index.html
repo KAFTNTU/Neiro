@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>TNTU AI TRAINER [Gesture Recognition]</title>
+    <style>
+        :root {
+            --primary: #00ffcc;
+            --bg: #050505;
+            --panel: #111;
+            --text: #eee;
+            --danger: #ff4444;
+            --success: #00cc66;
+            --font: 'Segoe UI', Consolas, monospace;
+        }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; display: flex; height: 100vh; }
+        
+        /* --- LAYOUT --- */
+        #viewport { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; background: #000; }
+        #sidebar { width: 340px; background: var(--panel); border-left: 2px solid var(--primary); padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; box-shadow: -5px 0 20px rgba(0,255,204,0.1); }
+        
+        /* --- VIDEO & CANVAS --- */
+        #cam-wrapper { position: relative; border: 2px solid #333; width: 640px; height: 480px; border-radius: 8px; overflow: hidden; }
+        #cam-wrapper.recording { border-color: var(--danger); box-shadow: 0 0 20px var(--danger); }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+
+        /* --- UI CONTROLS --- */
+        h1 { font-size: 20px; color: var(--primary); margin: 0; letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        h2 { font-size: 14px; color: #888; margin: 10px 0 5px 0; text-transform: uppercase; }
+        
+        .card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px solid #333; }
+        
+        button {
+            width: 100%; padding: 12px; margin-bottom: 8px;
+            background: #222; border: 1px solid var(--primary); color: var(--primary);
+            font-family: inherit; font-weight: bold; cursor: pointer; text-transform: uppercase;
+            transition: all 0.2s; font-size: 12px; letter-spacing: 1px;
+        }
+        button:hover:not(:disabled) { background: var(--primary); color: #000; box-shadow: 0 0 10px var(--primary); }
+        button:disabled { opacity: 0.3; cursor: not-allowed; border-color: #555; color: #555; }
+        button.record-btn:active { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+        .stat-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: #bbb; }
+        .count { background: #000; padding: 2px 6px; border-radius: 4px; color: var(--primary); font-family: monospace; }
+        
+        #console { 
+            font-family: 'Consolas', monospace; font-size: 11px; color: #666; 
+            height: 120px; overflow-y: auto; background: #000; padding: 10px; 
+            border: 1px solid #333; border-radius: 4px; margin-top: auto; 
+        }
+
+        #prediction-display {
+            text-align: center; font-size: 24px; font-weight: bold;
+            color: #444; margin-top: 10px; min-height: 35px;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #444; margin-right: 5px; }
+        .status-dot.active { background: var(--success); box-shadow: 0 0 5px var(--success); }
+    </style>
+    
+    <!-- Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+</head>
+<body>
+
+    <div id="viewport">
+        <div id="cam-wrapper">
+            <video id="video"></video>
+            <canvas id="output"></canvas>
+            <div id="stability-indicator" style="position: absolute; top: 10px; right: 10px; color: red; font-weight: bold; display: none;">UNSTABLE</div>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <h1>TNTU AI Trainer</h1>
+        
+        <div class="card">
+            <h2>1. Збір Даних</h2>
+            <div style="font-size: 11px; color: #888; margin-bottom: 10px;">Затисніть кнопку, щоб записати семпли. Рука має бути стабільною.</div>
+            
+            <div class="stat-row"><span>0. Idle (Спокій)</span><span id="c0" class="count">0</span></div>
+            <button class="record-btn" onmousedown="startRec(0)" onmouseup="stopRec()" onmouseleave="stopRec()">REC: IDLE</button>
+            
+            <div class="stat-row"><span>1. Grab (Хапати)</span><span id="c1" class="count">0</span></div>
+            <button class="record-btn" onmousedown="startRec(1)" onmouseup="stopRec()" onmouseleave="stopRec()">REC: GRAB</button>
+            
+            <div class="stat-row"><span>2. Rotate (Оберт)</span><span id="c2" class="count">0</span></div>
+            <button class="record-btn" onmousedown="startRec(2)" onmouseup="stopRec()" onmouseleave="stopRec()">REC: ROTATE</button>
+            
+            <div class="stat-row"><span>3. Zoom (Масштаб)</span><span id="c3" class="count">0</span></div>
+            <button class="record-btn" onmousedown="startRec(3)" onmouseup="stopRec()" onmouseleave="stopRec()">REC: ZOOM</button>
+            
+            <button onclick="clearAllData()" style="border-color: #444; color: #888; margin-top: 5px;">Очистити всі дані</button>
+        </div>
+
+        <div class="card">
+            <h2>2. Навчання</h2>
+            <button id="train-btn" onclick="train()">🚀 Start Training</button>
+            <div id="train-log" style="font-size: 11px; text-align: center; color: #aaa;">Статус: Очікування</div>
+        </div>
+
+        <div class="card">
+            <h2>3. Тест & Експорт</h2>
+            <div id="prediction-display">---</div>
+            <div style="display: flex; gap: 5px; margin-top: 10px;">
+                <button id="save-btn" onclick="saveModel()" disabled>💾 Download Model</button>
+            </div>
+        </div>
+
+        <div id="console">System ready...</div>
+    </div>
+
+<script>
+/**
+ * TNTU ENGINEERING SUITE - GESTURE TRAINER
+ * Features: Stability Check, Prediction Smoothing, TF.js Export
+ */
+
+// --- CONFIGURATION ---
+const CLASSES = ['Idle', 'Grab', 'Rotate', 'Zoom'];
+const HISTORY_SIZE = 10; // Smoothing buffer size
+const STABILITY_THRESHOLD = 0.03; // Movement threshold (lower = stricter)
+
+// --- STATE ---
+let isRecording = false;
+let currentLabel = -1;
+let trainingData = { inputs: [], labels: [] };
+let counts = [0,0,0,0];
+let model = null;
+let isTraining = false;
+let predictionHistory = [];
+
+// --- REFS ---
+const video = document.getElementById('video');
+const canvas = document.getElementById('output');
+const ctx = canvas.getContext('2d');
+const logBox = document.getElementById('console');
+const wrapper = document.getElementById('cam-wrapper');
+
+function log(msg) {
+    const time = new Date().toLocaleTimeString().split(' ')[0];
+    logBox.innerHTML += `[${time}] ${msg}<br>`;
+    logBox.scrollTop = logBox.scrollHeight;
+}
+
+// --- MEDIAPIPE SETUP ---
+const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+});
+
+let lastLandmarksFrame = null;
+
+hands.onResults((results) => {
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        
+        // 1. Draw Skeleton
+        drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color: '#00ffcc', lineWidth: 2});
+        drawLandmarks(ctx, landmarks, {color: '#ff0000', lineWidth: 1, radius: 3});
+
+        // 2. Check Stability (Motion Filter)
+        const stable = checkStability(landmarks);
+        
+        // 3. Logic: Recording or Predicting
+        if (isRecording) {
+            if (stable) {
+                recordSample(landmarks);
+                wrapper.classList.add('recording');
+                document.getElementById('stability-indicator').style.display = 'none';
+            } else {
+                wrapper.classList.remove('recording');
+                document.getElementById('stability-indicator').style.display = 'block';
+            }
+        } else {
+            wrapper.classList.remove('recording');
+            document.getElementById('stability-indicator').style.display = 'none';
+            if (model && !isTraining) {
+                predict(landmarks);
+            }
+        }
+    }
+    ctx.restore();
+});
+
+const camera = new Camera(video, {
+    onFrame: async () => { await hands.send({image: video}); },
+    width: 640, height: 480
+});
+camera.start();
+
+// --- CORE LOGIC: PREPROCESSING ---
+function preprocess(landmarks) {
+    const wrist = landmarks[0];
+    const features = [];
+    let maxDist = 0;
+
+    // 1. Center relative to wrist
+    for (let lm of landmarks) {
+        const x = lm.x - wrist.x;
+        const y = lm.y - wrist.y;
+        const z = lm.z - wrist.z;
+        features.push(x, y, z);
+        maxDist = Math.max(maxDist, Math.abs(x), Math.abs(y), Math.abs(z));
+    }
+
+    // 2. Normalize scale
+    return features.map(v => v / (maxDist + 0.000001));
+}
+
+// --- CORE LOGIC: STABILITY CHECK ---
+function checkStability(landmarks) {
+    if (!lastLandmarksFrame) {
+        lastLandmarksFrame = landmarks;
+        return false;
+    }
+    
+    let totalDelta = 0;
+    for(let i=0; i<landmarks.length; i++) {
+        const dx = landmarks[i].x - lastLandmarksFrame[i].x;
+        const dy = landmarks[i].y - lastLandmarksFrame[i].y;
+        totalDelta += Math.sqrt(dx*dx + dy*dy);
+    }
+    
+    lastLandmarksFrame = landmarks;
+    // If movement is less than threshold, it's stable
+    return totalDelta < STABILITY_THRESHOLD;
+}
+
+// --- DATA COLLECTION ---
+function startRec(label) { isRecording = true; currentLabel = label; }
+function stopRec() { isRecording = false; currentLabel = -1; }
+
+function recordSample(landmarks) {
+    const input = preprocess(landmarks);
+    trainingData.inputs.push(input);
+    trainingData.labels.push(currentLabel);
+    
+    counts[currentLabel]++;
+    document.getElementById(`c${currentLabel}`).innerText = counts[currentLabel];
+    
+    if (counts[currentLabel] % 10 === 0) log(`Collected ${counts[currentLabel]} samples for ${CLASSES[currentLabel]}`);
+}
+
+function clearAllData() {
+    trainingData = { inputs: [], labels: [] };
+    counts = [0,0,0,0];
+    for(let i=0; i<4; i++) document.getElementById(`c${i}`).innerText = 0;
+    if(model) { model.dispose(); model = null; }
+    document.getElementById('save-btn').disabled = true;
+    log("Memory cleared.");
+}
+
+// --- TRAINING ---
+async function train() {
+    if (trainingData.inputs.length === 0) { alert("No data collected!"); return; }
+    
+    isTraining = true;
+    document.getElementById('train-btn').disabled = true;
+    log("Encoding tensors...");
+
+    const inputsTensor = tf.tensor2d(trainingData.inputs);
+    const labelTensor = tf.oneHot(tf.tensor1d(trainingData.labels, 'int32'), 4);
+
+    model = tf.sequential();
+    model.add(tf.layers.dense({units: 64, activation: 'relu', inputShape: [63]}));
+    model.add(tf.layers.dropout({rate: 0.2})); // Prevent overfitting
+    model.add(tf.layers.dense({units: 32, activation: 'relu'}));
+    model.add(tf.layers.dense({units: 4, activation: 'softmax'}));
+
+    model.compile({
+        optimizer: tf.train.adam(0.001),
+        loss: 'categoricalCrossentropy',
+        metrics: ['accuracy']
+    });
+
+    log("Training started...");
+    
+    await model.fit(inputsTensor, labelTensor, {
+        epochs: 40,
+        batchSize: 16,
+        shuffle: true,
+        callbacks: {
+            onEpochEnd: (epoch, logs) => {
+                document.getElementById('train-log').innerText = `Epoch ${epoch+1}: Loss ${logs.loss.toFixed(4)} | Acc ${logs.acc.toFixed(4)}`;
+            }
+        }
+    });
+
+    log("Training Complete. Accuracy: " + document.getElementById('train-log').innerText);
+    isTraining = false;
+    document.getElementById('train-btn').disabled = false;
+    document.getElementById('save-btn').disabled = false;
+    
+    inputsTensor.dispose();
+    labelTensor.dispose();
+}
+
+// --- PREDICTION & SMOOTHING ---
+function predict(landmarks) {
+    tf.tidy(() => {
+        const input = tf.tensor2d([preprocess(landmarks)]);
+        const result = model.predict(input);
+        const data = result.dataSync();
+        const winnerIdx = result.argMax(1).dataSync()[0];
+        const confidence = data[winnerIdx];
+
+        // 1. Add to history buffer
+        predictionHistory.push({ idx: winnerIdx, conf: confidence });
+        if (predictionHistory.length > HISTORY_SIZE) predictionHistory.shift();
+
+        // 2. Voting / Smoothing
+        const voteCounts = {};
+        predictionHistory.forEach(p => {
+            voteCounts[p.idx] = (voteCounts[p.idx] || 0) + 1;
+        });
+
+        // Get class with most votes
+        let stableIdx = parseInt(Object.keys(voteCounts).reduce((a, b) => voteCounts[a] > voteCounts[b] ? a : b));
+        
+        // Calculate average confidence for the stable class
+        const relevantProps = predictionHistory.filter(p => p.idx === stableIdx);
+        const avgConf = relevantProps.reduce((sum, p) => sum + p.conf, 0) / relevantProps.length;
+
+        // 3. UI Update
+        const disp = document.getElementById('prediction-display');
+        disp.innerText = CLASSES[stableIdx];
+        
+        if (avgConf > 0.85) {
+            disp.style.color = 'var(--primary)';
+        } else {
+            disp.style.color = '#555'; // Uncertain
+        }
+
+        // Draw overlay on canvas
+        ctx.font = "bold 24px monospace";
+        ctx.fillStyle = avgConf > 0.85 ? "#00ffcc" : "rgba(255,255,255,0.5)";
+        ctx.fillText(`${CLASSES[stableIdx]} ${(avgConf*100).toFixed(0)}%`, 20, 40);
+    });
+}
+
+// --- EXPORT ---
+async function saveModel() {
+    log("Downloading model files...");
+    await model.save('downloads://gesture-model');
+    log("Files saved. Use them in your main app.");
+}
+</script>
+</body>
+</html>
+
